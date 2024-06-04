@@ -33,25 +33,29 @@ async def evaluate_dayandtimerange(data: dict, src=None):
             raise ValueError('invalid start time')
 
         # Adjust target_weekday to make Sunday 0
-        target_weekday = (current_datetime.isoweekday() % 7)
+        target_weekday = (current_datetime.weekday() + 1) % 7
 
-        if target_weekday < start_day or target_weekday > end_day:
-            return not_operator ^ False
-        
-        current_time = datetime.datetime.strptime(current_datetime.strftime("%H:%M"), "%H:%M").time()
+        # Convert times to time objects
+        current_time = current_datetime.time()
         start_time = datetime.datetime.strptime(start_time, "%H:%M:%S").time()
         end_time = datetime.datetime.strptime(end_time, "%H:%M:%S").time()
 
-        # Check if the current time is within the valid time range
-        if start_time <= end_time:
-            # logger.info('Simple case: time range does not cross midnight')
+        if start_day == end_day:
+            # Check if the current time is within the valid time range on the same day
             result = start_time <= current_time <= end_time
         else:
-            # logger.info('Complex case: time range crosses midnight')
-            result = current_time >= start_time or current_time <= end_time
-        
+            # Check across multiple days
+            if start_day < end_day:
+                result = (target_weekday > start_day or (target_weekday == start_day and current_time >= start_time)) and \
+                         (target_weekday < end_day or (target_weekday ==
+                          end_day and current_time <= end_time))
+            else:  # Range crosses the week boundary
+                result = (target_weekday > start_day or target_weekday < end_day or
+                          (target_weekday == start_day and current_time >= start_time) or
+                          (target_weekday == end_day and current_time <= end_time))
+
         return not_operator ^ result
-        
+
     except Exception as err:
         print(str(err))
         return False
