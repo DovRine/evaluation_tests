@@ -127,7 +127,7 @@ async def test_invalid_end_time():
 
 
 @pytest.mark.asyncio
-async def test_edge_case_midnight():
+async def test_edge_case_midnight_single_day():
     data = {
         # Midnight Tuesday
         'now': datetime(2024, 6, 4, 0, 0, 0, tzinfo=timezone.utc),
@@ -140,6 +140,24 @@ async def test_edge_case_midnight():
         'condition': {}
     }
     assert await evaluate_dayandtimerange(data) is True
+
+
+@pytest.mark.asyncio
+async def test_edge_case_third_shift_out_of_range():
+    # 22:00 - 07:30 Sun to Thurs (PST)
+
+    data = {
+        # Tuesday
+        'now': datetime(2024, 6, 4, 13, 0, 0, tzinfo=timezone.utc),
+        'terms': {
+            'start_day_of_week': 1,  # Monday
+            'start_time': '05:00:00',
+            'end_day_of_week': 5,  # Friday
+            'end_time': '14:30:00'
+        },
+        'condition': {}
+    }
+    assert await evaluate_dayandtimerange(data) is False
 
 
 @pytest.mark.asyncio
