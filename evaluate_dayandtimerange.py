@@ -182,7 +182,7 @@ def generate_time_ranges(start_day, start_time, end_day, end_time):
     return time_ranges
 
 
-async def evaluate_dayandtimerange(data):
+async def evaluate_dayandtimerange(data, src=None):
     """
     Evaluates if the current date and time fall within the specified range in data.
 
@@ -215,17 +215,29 @@ async def evaluate_dayandtimerange(data):
     """
     not_operator = False
     try:
-        current_datetime = data['now']
+        current_datetime = data.get(
+            'now', datetime.datetime.now(datetime.timezone.utc))
         current_weekday = current_datetime.weekday()
         current_time = current_datetime.time()
 
-        src = data.get('terms', data.get('condition', {}))
+        if src == 'logaction':
+            not_operator = data.get('not_operator', False)
+            start_day_of_week = data.get('start_day_of_week', -1)
+            start_time = data.get('start_time', '-1:-1:-1')
+            end_day_of_week = data.get('end_day_of_week', -1)
+            end_time = data.get('end_time', '-1:-1:-1')
 
-        start_day_of_week = src.get('start_day_of_week', -1)
-        start_time = src.get('start_time', '-1:-1:-1')
-        end_day_of_week = src.get('end_day_of_week', -1)
-        end_time = src.get('end_time', '-1:-1:-1')
-        not_operator = data.get('condition', {}).get('not_operator', False)
+        elif src is None:
+            terms = data.get('terms', {})
+            condition = data.get('condition', {})
+            not_operator = condition.get('not_operator', False)
+            start_day_of_week = terms.get('start_day_of_week', -1)
+            start_time = terms.get('start_time', '-1:-1:-1')
+            end_day_of_week = terms.get('end_day_of_week', -1)
+            end_time = terms.get('end_time', '-1:-1:-1')
+
+        else:
+            raise ValueError('invalid src')
 
         if start_day_of_week == -1 or \
                 start_time == '-1:-1:-1' or \
@@ -274,5 +286,5 @@ async def evaluate_dayandtimerange(data):
         return not_operator ^ False
 
     except Exception as e:
-        print(f"Error in evaluate_dayandtimerange: {e}")
+        print(str(e))
         return not_operator ^ False
