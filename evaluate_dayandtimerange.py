@@ -76,6 +76,7 @@ def generate_time_ranges(start_day, start_time, end_day, end_time):
 
 
 async def evaluate_dayandtimerange(data):
+    not_operator = False
     try:
         current_datetime = data['now']
         current_weekday = current_datetime.weekday()
@@ -89,7 +90,10 @@ async def evaluate_dayandtimerange(data):
         end_time = src.get('end_time', '-1:-1:-1')
         not_operator = data.get('condition', {}).get('not_operator', False)
 
-        if start_day_of_week == -1 or start_time == '-1:-1:-1' or end_day_of_week == -1 or end_time == '-1:-1:-1':
+        if start_day_of_week == -1 or \
+                start_time == '-1:-1:-1' or \
+                end_day_of_week == -1 or \
+                end_time == '-1:-1:-1':
             return not_operator ^ False
 
         if isinstance(start_time, str):
@@ -109,7 +113,8 @@ async def evaluate_dayandtimerange(data):
                 if is_within_time_range(start_time, end_time, current_time):
                     return not_operator ^ True
         else:
-            if current_weekday >= start_day_of_week or current_weekday <= end_day_of_week:
+            if current_weekday >= start_day_of_week or \
+                    current_weekday <= end_day_of_week:
                 if is_within_time_range(start_time, end_time, current_time):
                     return not_operator ^ True
 
