@@ -33,36 +33,14 @@ def is_within_night_shift(target_weekday, current_time, start_day, start_time, e
     return False
 
 
-async def evaluate_time_range(current_datetime, start_day, start_time, end_day, end_time):
-    time_ranges = generate_time_ranges(
-        start_day, start_time, end_day, end_time)
-    current_time = current_datetime
-
-    print(f"Evaluating Time Range - current_datetime: {current_datetime}")
-
-    for start_dt, end_dt in time_ranges:
-        if start_dt <= current_time <= end_dt:
-            return True
-
-    return False
-
-
 def generate_time_ranges(start_day, start_time, end_day, end_time):
     time_ranges = []
 
-    # Check if start_time and end_time are already datetime.time objects
     if isinstance(start_time, str):
-        start_time_dt = datetime.datetime.strptime(
-            start_time, "%H:%M:%S").time()
-    else:
-        start_time_dt = start_time
-
+        start_time = datetime.datetime.strptime(start_time, "%H:%M:%S").time()
     if isinstance(end_time, str):
-        end_time_dt = datetime.datetime.strptime(end_time, "%H:%M:%S").time()
-    else:
-        end_time_dt = end_time
+        end_time = datetime.datetime.strptime(end_time, "%H:%M:%S").time()
 
-    # Calculate base date based on the current date
     today = datetime.datetime.today()
     current_weekday = today.weekday()
     base_date = today - datetime.timedelta(days=current_weekday)
@@ -77,87 +55,66 @@ def generate_time_ranges(start_day, start_time, end_day, end_time):
         return (start_dt, end_dt)
 
     if start_day == end_day:
-        time_ranges.append(create_range(
-            base_date + datetime.timedelta(days=start_day), start_time_dt, end_time_dt))
+        current_date = base_date + datetime.timedelta(days=start_day)
+        time_ranges.append(create_range(current_date, start_time, end_time))
     elif start_day < end_day:
         current_date = base_date + datetime.timedelta(days=start_day)
         while current_date.weekday() != end_day:
             time_ranges.append(create_range(
-                current_date, start_time_dt, end_time_dt))
+                current_date, start_time, end_time))
             current_date += datetime.timedelta(days=1)
-        time_ranges.append(create_range(
-            current_date, start_time_dt, end_time_dt))  # Add the last day
-    else:  # start_day > end_day (crossing week boundary)
-        current_date = base_date + datetime.timedelta(days=start_day - 7)
+        time_ranges.append(create_range(current_date, start_time, end_time))
+    else:
+        current_date = base_date + datetime.timedelta(days=start_day)
         while current_date.weekday() != end_day:
             time_ranges.append(create_range(
-                current_date, start_time_dt, end_time_dt))
+                current_date, start_time, end_time))
             current_date += datetime.timedelta(days=1)
-        time_ranges.append(create_range(
-            current_date, start_time_dt, end_time_dt))  # Add the last day
-
-    # Debug log
-    print("Generated time ranges:", time_ranges)
+        time_ranges.append(create_range(current_date, start_time, end_time))
 
     return time_ranges
 
 
-async def evaluate_dayandtimerange(data: dict, src=None):
+async def evaluate_dayandtimerange(data):
     try:
-        current_datetime = data.get(
-            'now', datetime.datetime.now(datetime.timezone.utc))
+        current_datetime = data['now']
+        current_weekday = current_datetime.weekday()
+        current_time = current_datetime.time()
 
-        if src == 'logaction':
-            not_operator = data.get('not_operator', False)
-            start_day = data.get('start_day_of_week', -1)
-            start_time = data.get('start_time', '-1:-1:-1')
-            end_day = data.get('end_day_of_week', -1)
-            end_time = data.get('end_time', '-1:-1:-1')
+        src = data.get('terms', data.get('condition', {}))
 
-        elif src is None:
-            terms = data.get('terms', {})
-            condition = data.get('condition', {})
-            not_operator = condition.get('not_operator', False)
-            start_day = terms.get('start_day_of_week', -1)
-            start_time = terms.get('start_time', '-1:-1:-1')
-            end_day = terms.get('end_day_of_week', -1)
-            end_time = terms.get('end_time', '-1:-1:-1')
-        else:
-            raise ValueError('invalid src')
+        start_day_of_week = src.get('start_day_of_week', -1)
+        start_time = src.get('start_time', '-1:-1:-1')
+        end_day_of_week = src.get('end_day_of_week', -1)
+        end_time = src.get('end_time', '-1:-1:-1')
+        not_operator = data.get('condition', {}).get('not_operator', False)
 
-        if start_day == -1 or end_day == -1 or '-1' in start_time or '-1' in end_time:
-            raise ValueError('invalid parameters')
+        if start_day_of_week == -1 or start_time == '-1:-1:-1' or end_day_of_week == -1 or end_time == '-1:-1:-1':
+            return not_operator ^ False
 
-        # Debug prints to check types
-        print(f"start_time before parsing: {
-              start_time}, type: {type(start_time)}")
-        print(f"end_time before parsing: {end_time}, type: {type(end_time)}")
-
-        # Check if start_time and end_time are already datetime.time objects
-        if not isinstance(start_time, datetime.time):
+        if isinstance(start_time, str):
             start_time = datetime.datetime.strptime(
                 start_time, "%H:%M:%S").time()
-        if not isinstance(end_time, datetime.time):
+        if isinstance(end_time, str):
             end_time = datetime.datetime.strptime(end_time, "%H:%M:%S").time()
 
-        # Debug prints to check types after parsing
-        print(f"start_time after parsing: {
-              start_time}, type: {type(start_time)}")
-        print(f"end_time after parsing: {end_time}, type: {type(end_time)}")
+        def is_within_time_range(start_time, end_time, current_time):
+            if start_time <= end_time:
+                return start_time <= current_time <= end_time
+            else:
+                return current_time >= start_time or current_time <= end_time
 
-        time_ranges = generate_time_ranges(
-            start_day, start_time, end_day, end_time)
-        current_time_aware = current_datetime.replace(
-            tzinfo=datetime.timezone.utc)
-
-        for start_dt, end_dt in time_ranges:
-            start_dt = start_dt.replace(tzinfo=datetime.timezone.utc)
-            end_dt = end_dt.replace(tzinfo=datetime.timezone.utc)
-            if start_dt <= current_time_aware <= end_dt:
-                return not_operator ^ True
+        if start_day_of_week <= end_day_of_week:
+            if start_day_of_week <= current_weekday <= end_day_of_week:
+                if is_within_time_range(start_time, end_time, current_time):
+                    return not_operator ^ True
+        else:
+            if current_weekday >= start_day_of_week or current_weekday <= end_day_of_week:
+                if is_within_time_range(start_time, end_time, current_time):
+                    return not_operator ^ True
 
         return not_operator ^ False
 
-    except Exception as err:
-        print(str(err))
-        return False
+    except Exception as e:
+        print(f"Error in evaluate_dayandtimerange: {e}")
+        return not_operator ^ False
