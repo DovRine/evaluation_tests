@@ -320,5 +320,37 @@ async def test_outside_boundary_end_time():
     }
     assert await evaluate_dayandtimerange(data) is False
 
+
+@pytest.mark.asyncio
+async def test_third_shift_over_the_weekend_not_ok():
+    # Fri 2200 to Sun 0730
+    data = {
+        'now': datetime(2024, 6, 3, 6, 0, 0, tzinfo=timezone.utc),  # Monday
+        'terms': {
+            'start_day_of_week': 5,
+            'start_time': '22:00:00',
+            'end_day_of_week': 0,
+            'end_time': '07:30:00'
+        },
+        'condition': {}
+    }
+    assert await evaluate_dayandtimerange(data) is False
+
+
+@pytest.mark.asyncio
+async def test_third_shift_over_the_weekend_ok():
+    # Fri 2200 to Sun 0730
+    data = {
+        'now': datetime(2024, 6, 2, 6, 0, 0, tzinfo=timezone.utc),  # Sunday
+        'terms': {
+            'start_day_of_week': 5,
+            'start_time': '22:00:00',
+            'end_day_of_week': 0,
+            'end_time': '07:30:00'
+        },
+        'condition': {}
+    }
+    assert await evaluate_dayandtimerange(data) is True
+
 if __name__ == '__main__':
     pytest.main()

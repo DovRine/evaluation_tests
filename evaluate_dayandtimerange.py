@@ -183,36 +183,6 @@ def generate_time_ranges(start_day, start_time, end_day, end_time):
 
 
 async def evaluate_dayandtimerange(data):
-    """
-    Evaluates if the current date and time fall within the specified range in data.
-
-    Args:
-        data (dict): A dictionary containing:
-            - 'now' (datetime): The current date and time.
-            - 'terms' (dict): A dictionary with:
-                - 'start_day_of_week' (int): Start day of the week (0-6, where 0 is Monday).
-                - 'start_time' (str): Start time in HH:MM:SS format.
-                - 'end_day_of_week' (int): End day of the week (0-6, where 0 is Monday).
-                - 'end_time' (str): End time in HH:MM:SS format.
-            - 'condition' (dict): A dictionary with optional 'not_operator' (bool).
-
-    Returns:
-        bool: True if the current date and time are within the range, else False.
-
-    Examples:
-        >>> data = {
-        ...     'now': datetime(2024, 6, 4, 6, 0, 0, tzinfo=timezone.utc),
-        ...     'terms': {
-        ...         'start_day_of_week': 0,
-        ...         'start_time': '22:00:00',
-        ...         'end_day_of_week': 4,
-        ...         'end_time': '07:30:00'
-        ...     },
-        ...     'condition': {}
-        ... }
-        >>> await evaluate_dayandtimerange(data)
-        True
-    """
     not_operator = False
     try:
         current_datetime = data['now']
@@ -245,16 +215,36 @@ async def evaluate_dayandtimerange(data):
             else:
                 return current_time >= start_time or current_time <= end_time
 
+        print(f"Evaluating range: {start_day_of_week} {
+              start_time} to {end_day_of_week} {end_time}")
+        print(f"Current: {current_weekday} {current_time}")
+
         if start_day_of_week <= end_day_of_week:
             if start_day_of_week <= current_weekday <= end_day_of_week:
                 if is_within_time_range(start_time, end_time, current_time):
+                    print("Within range (same week)")
                     return not_operator ^ True
         else:
-            if current_weekday >= start_day_of_week or \
-                    current_weekday <= end_day_of_week:
+            # Adjust for cross-week evaluation
+            current_weekday = (current_weekday + 1) % 7
+            if current_weekday > start_day_of_week or current_weekday < end_day_of_week:
                 if is_within_time_range(start_time, end_time, current_time):
+                    print("Within range (crossing week boundary)")
                     return not_operator ^ True
+            elif current_weekday == start_day_of_week:
+                if current_time >= start_time:
+                    print("Within range on start day after start time")
+                    return not_operator ^ True
+            elif current_weekday == end_day_of_week:
+                if current_time <= end_time:
+                    print("Within range on end day before end time")
+                    return not_operator ^ True
+            elif (current_weekday == (end_day_of_week + 1) % 7):
+                if current_time <= end_time:
+                    print("Within range on the day after end day before end time")
+                    return not_operator ^ False
 
+        print("Outside range")
         return not_operator ^ False
 
     except Exception as e:
